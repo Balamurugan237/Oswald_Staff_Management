@@ -7,7 +7,7 @@ import {
   saveAttendanceRecord,
   subscribeToRealtimeAttendance,
   isSupabaseConfigured 
-} from './supabaseClient';
+} from "./supabaseClient";
 import { formatSystemTime, showToast } from './utils';
 
 // Views
