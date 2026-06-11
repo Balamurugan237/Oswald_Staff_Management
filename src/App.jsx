@@ -6,7 +6,8 @@ import {
   deleteStaffMember, 
   saveAttendanceRecord,
   subscribeToRealtimeAttendance,
-  isSupabaseConfigured 
+  isSupabaseConfigured,
+  supabase 
 } from "./supabaseClient";
 import { formatSystemTime, showToast } from './utils';
 
@@ -50,6 +51,11 @@ export default function App() {
   // Idle Timeout States
   const [showIdlePopup, setShowIdlePopup] = useState(false);
   const [idleCountdown, setIdleCountdown] = useState(60);
+
+  // Set Password Modal States (Invitation Flow)
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Fetch Database Helper
   const refreshDatabase = () => {
@@ -97,6 +103,70 @@ export default function App() {
       unsubscribe();
     };
   }, []);
+
+  // Listen for Supabase Authentication state updates (Invitation / Password Recovery links)
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    // 1. Check current hash in URL immediately on load
+    const checkHash = () => {
+      const hash = window.location.hash || '';
+      if (hash.includes('type=invite') || hash.includes('type=recovery') || hash.includes('access_token=')) {
+        setShowSetPasswordModal(true);
+      }
+    };
+    checkHash();
+
+    // 2. Listen to active auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowSetPasswordModal(true);
+      } else if (event === 'SIGNED_IN') {
+        const hash = window.location.hash || '';
+        if (hash.includes('type=invite') || hash.includes('type=recovery') || hash.includes('access_token=')) {
+          setShowSetPasswordModal(true);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      showToast('Validation Error', 'Password must be at least 6 characters long.', 'warning');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        showToast('Update Failed', error.message || 'Failed to set password.', 'danger');
+      } else {
+        showToast('Password Set', 'Your new password has been established successfully. Please sign in.', 'success');
+        
+        // Log out to clear current session and force them to use the login page
+        await supabase.auth.signOut();
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+        
+        // Clean URL hash parameters
+        window.history.replaceState(null, null, window.location.pathname);
+        
+        // Close modal
+        setShowSetPasswordModal(false);
+        setNewPassword('');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Error', 'An unexpected error occurred.', 'danger');
+    }
+    setIsUpdatingPassword(false);
+  };
 
   // Listen to toast event trigger
   useEffect(() => {
@@ -587,6 +657,47 @@ export default function App() {
             <button style={styles.modalBtn} onClick={handleKeepWorking}>
               Yes, I am working
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* SET PASSWORD / ONBOARDING MODAL */}
+      {showSetPasswordModal && (
+        <div style={styles.overlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>Set Your Password</h3>
+            <p style={styles.modalText}>
+              Welcome to the Oswald Staff Portal! Please establish a secure password to complete your account activation.
+            </p>
+            <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '600', marginBottom: '6px' }}>New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="•••••••• (Min 6 characters)"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '8px',
+                    color: '#f3f4f6',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isUpdatingPassword}
+                style={styles.modalBtn}
+              >
+                {isUpdatingPassword ? 'Saving...' : 'Activate Account'}
+              </button>
+            </form>
           </div>
         </div>
       )}
