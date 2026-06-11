@@ -14,6 +14,11 @@ export const supabase = (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'http
 
 export const isSupabaseConfigured = !!supabase;
 
+export function shouldUseMock() {
+  if (!isSupabaseConfigured) return true;
+  return localStorage.getItem('ossp_use_mock_mode') === 'true';
+}
+
 if (isSupabaseConfigured) {
   console.log('🔌 Supabase is connected successfully.');
 } else {
@@ -281,7 +286,7 @@ function notifySubscribers(payload) {
  * Fetches all staff members
  */
 export async function getStaffList() {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const { data, error } = await supabase
       .from('staff')
       .select('*')
@@ -328,7 +333,7 @@ function getLocalStaff() {
  * Saves or updates a staff member
  */
 export async function saveStaffMember(staffObj) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const dbObj = {
       name: staffObj.name,
       email: staffObj.email,
@@ -407,7 +412,7 @@ export async function saveStaffMember(staffObj) {
  * Deletes a staff member
  */
 export async function deleteStaffMember(id) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const { error } = await supabase
       .from('staff')
       .delete()
@@ -435,7 +440,7 @@ export async function deleteStaffMember(id) {
  * Fetches attendance records filtered by date range
  */
 export async function getAttendanceList(startDate, endDate) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     let query = supabase.from('attendance').select('*');
     if (startDate) query = query.gte('date', startDate);
     if (endDate) query = query.lte('date', endDate);
@@ -507,7 +512,7 @@ export function mapUIStatusToDB(status) {
  * Saves a single attendance record
  */
 export async function saveAttendanceRecord(record) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const dbRecord = {
       staff_id: record.staffId,
       date: record.date,
@@ -563,7 +568,7 @@ export async function saveAttendanceRecord(record) {
  * Saves a batch of attendance records
  */
 export async function saveAttendanceBatch(records) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const dbRecords = records.map(record => ({
       staff_id: record.staffId,
       date: record.date,
@@ -654,7 +659,7 @@ export function addLocalActivity(text, user = 'Admin User') {
  * Falls back to our local pub/sub system if Supabase is offline.
  */
 export function subscribeToRealtimeAttendance(callback) {
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !shouldUseMock()) {
     const channel = supabase
       .channel('schema-db-changes')
       .on(

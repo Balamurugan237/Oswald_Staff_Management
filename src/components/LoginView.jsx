@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { User, Lock, Mail } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { supabase, isSupabaseConfigured } from '../supabaseClient';
 import { showToast } from '../utils';
 
 export default function LoginView({ onLogin, staffList }) {
   const [role, setRole] = useState('staff');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [useMockMode, setUseMockMode] = useState(!isSupabaseConfigured ? true : localStorage.getItem('ossp_use_mock_mode') === 'true');
   const [loading, setLoading] = useState(false);
 
   const handleRoleSelect = (selectedRole) => {
@@ -34,8 +35,9 @@ export default function LoginView({ onLogin, staffList }) {
     setLoading(true);
 
     try {
-      // ✅ Fallback to Mock Demo Mode if Supabase is not configured
-      if (!supabase) {
+      // ✅ Fallback to Mock Demo Mode if selected OR if Supabase is not configured
+      if (useMockMode || !supabase) {
+        localStorage.setItem('ossp_use_mock_mode', 'true');
         if (role === 'admin') {
           if (email.toLowerCase().trim() === 'balamurugan16205@gmail.com') {
             onLogin({ role: 'admin', email: email.toLowerCase().trim(), id: 'mock-admin' });
@@ -60,13 +62,14 @@ export default function LoginView({ onLogin, staffList }) {
         return;
       }
 
-      // ✅ Supabase Auth — Real password check!
+      // ✅ Real Supabase Auth (Password Check)
       if (!password) {
         showToast('Validation Error', 'Please enter your password.', 'warning');
         setLoading(false);
         return;
       }
 
+      localStorage.setItem('ossp_use_mock_mode', 'false');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password: password,
@@ -177,9 +180,26 @@ export default function LoginView({ onLogin, staffList }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 style={styles.input}
-                required
+                disabled={useMockMode}
+                required={!useMockMode}
               />
             </div>
+          </div>
+
+          {/* Toggle Mock Mode Checkbox */}
+          <div style={styles.checkboxContainer}>
+            <label style={styles.checkboxLabel}>
+              <input 
+                type="checkbox" 
+                checked={useMockMode} 
+                onChange={(e) => setUseMockMode(e.target.checked)}
+                disabled={!isSupabaseConfigured}
+                style={styles.checkbox}
+              />
+              <span style={{ marginLeft: '8px' }}>
+                Use Mock Demo Mode {!isSupabaseConfigured && <span style={{ color: '#6b7280', fontSize: '11px' }}>(Supabase keys offline)</span>}
+              </span>
+            </label>
           </div>
 
           <button type="submit" style={styles.loginBtn} disabled={loading}>
@@ -188,7 +208,7 @@ export default function LoginView({ onLogin, staffList }) {
         </form>
 
         <div style={styles.footer}>
-          <span>Secured by Supabase Authentication</span>
+          <span>{useMockMode ? 'Running in Offline Mock Mode' : 'Secured by Supabase Authentication'}</span>
         </div>
       </div>
     </div>
@@ -273,6 +293,23 @@ const styles = {
     cursor: 'pointer',
     marginTop: '8px',
     opacity: 1
+  },
+  checkboxContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    marginTop: '4px',
+    marginBottom: '8px'
+  },
+  checkboxLabel: {
+    color: '#9ca3af',
+    fontSize: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    userSelect: 'none'
+  },
+  checkbox: {
+    cursor: 'pointer'
   },
   footer: { textAlign: 'center', fontSize: '11px', color: '#6b7280' }
 };
