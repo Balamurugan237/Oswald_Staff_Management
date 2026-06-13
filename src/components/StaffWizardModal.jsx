@@ -4,7 +4,8 @@ import {
   validatePhone, 
   validateAadhaar, 
   validatePAN, 
-  showToast 
+  showToast,
+  compressImage
 } from '../utils';
 
 export default function StaffWizardModal({ isOpen, onClose, editMember, onSave }) {
@@ -119,18 +120,18 @@ export default function StaffWizardModal({ isOpen, onClose, editMember, onSave }
     }
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 200 * 1024) {
-        showToast('File Too Large', 'Please select an image smaller than 200KB.', 'danger');
-        return;
+      try {
+        // Compress the image down to standard avatar dimension (e.g. max 300px, 0.7 quality)
+        const compressedBase64 = await compressImage(file, 300, 300, 0.7);
+        setFormData(prev => ({ ...prev, photo: compressedBase64 }));
+        showToast('Image Compressed', 'Your photo was compressed successfully for optimal storage.', 'success');
+      } catch (err) {
+        console.error("Image compression error:", err);
+        showToast('Upload Error', 'Failed to compress the uploaded photo.', 'danger');
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFormData(prev => ({ ...prev, photo: event.target.result }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -301,7 +302,7 @@ export default function StaffWizardModal({ isOpen, onClose, editMember, onSave }
                     <label htmlFor="staff-photo" id="btn-upload-photo" className="btn btn-secondary" style={{ height: '32px', padding: '0 12px', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
                       Upload Photo
                     </label>
-                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>JPG, PNG or SVG. Max 200KB.</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>JPG, PNG or SVG. Automatically compressed for speed.</p>
                   </div>
                 </div>
 
